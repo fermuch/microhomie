@@ -24,8 +24,8 @@ class HomieNode(object):
         """Print nice information about the object"""
         raise NotImplementedError('not implemented')
 
-    def get_node_id(self):
-        """Return one ore more node ids as list"""
+    def get_node_properties(self):
+        """Return one ore more node properties as list"""
         raise NotImplementedError('not implemented')
 
     def get_properties(self):

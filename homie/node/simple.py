@@ -38,7 +38,7 @@ class SimpleHomieNode(HomieNode):
                                   self.property.decode(),
                                   self.value)
 
-    def get_node_id(self):
+    def get_node_properties(self):
         return [self.type]
 
     def broadcast_callback(self, payload):

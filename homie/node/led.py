@@ -18,13 +18,12 @@ class LED(HomieNode):
     def __str__(self):
         return 'LED status = {}'.format(ONOFF[self.led.value()])
 
-    def get_node_id(self):
+    def get_node_properties(self):
         return [b'led']
 
     def get_properties(self):
         return (
-            Property(b'led/$type', b'led', True),
-            Property(b'led/$properties', b'power', True),
+            Property(b'led/$name', b'Device LED', True),
             Property(b'led/power/$settable', b'true', True),
             Property(b'led/power/$name', b'LED', True),
             Property(b'led/power/$datatype', b'string', True),

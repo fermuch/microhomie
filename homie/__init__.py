@@ -1,3 +1,4 @@
+import gc
 import sys
 import utime
 from ucollections import namedtuple
@@ -44,7 +45,7 @@ class HomieDevice:
 
         try:
             self._umqtt_connect()
-        except:
+        except Exception:
             print('ERROR: can not connect to MQTT')
             # self.mqtt.publish = lambda topic, payload, retain, qos: None
 
@@ -66,14 +67,25 @@ class HomieDevice:
         self.mqtt.set_callback(self.sub_cb)
 
         # set last will testament
-        self.mqtt.set_last_will(self.topic + b'/$online', b'false',
+        self.mqtt.set_last_will(self.topic + b'/$state', b'lost',
                                 retain=True, qos=1)
 
         self.mqtt.connect()
 
+        # The first message
+        self.publish(b'state', b'init')
+
         # subscribe to device topics
         self.mqtt.subscribe(self.topic + b'/$stats/interval/set')
         self.mqtt.subscribe(self.topic + b'/$broadcast/#')
+
+    def disconnect(self):
+        """call this method if before disconnect the device"""
+        self.publish(b'state', b'disconnected')
+
+    def deepsleep(self, timeout):
+        """call this method if before device deepsleep"""
+        self.publish(b'state', b'sleeping')
 
     def add_node(self, node):
         """add a node class of HomieNode to this device"""
@@ -81,7 +93,7 @@ class HomieDevice:
 
         # add node_ids
         try:
-            self.node_ids.extend(node.get_node_id())
+            self.node_ids.extend(node.get_node_properties())
         except NotImplementedError:
             raise
         except Exception:
@@ -99,7 +111,7 @@ class HomieDevice:
 
         if b'$stats/interval/set' in topic:
             self.stats_interval = int(message.decode())
-            self.publish(b'$stats/interval', self.stats_interval, True)
+            self.publish(b'$stats/interval', self.stats_interval)
             self.next_update = utime.time() + self.stats_interval
         elif b'$broadcast/#' in topic:
             for node in self.nodes:
@@ -142,14 +154,14 @@ class HomieDevice:
         """publish device and node properties"""
         # node properties
         properties = (
-            Property(b'$homie', b'2.1.0', True),
-            Property(b'$online', b'true', True),
+            Property(b'$homie', b'3.0.0', True),
             Property(b'$name', self.settings.DEVICE_NAME, True),
             Property(b'$fw/name', self.settings.DEVICE_FW_NAME, True),
             Property(b'$fw/version', __version__, True),
             Property(b'$implementation', bytes(sys.platform, 'utf-8'), True),
             Property(b'$localip', utils.get_local_ip(), True),
             Property(b'$mac', utils.get_local_mac(), True),
+            Property(b'$stats', b'uptime,freeheap,signal', True),
             Property(b'$stats/interval', self.stats_interval, True),
             Property(b'$nodes', b','.join(self.node_ids), True)
         )
@@ -166,8 +178,10 @@ class HomieDevice:
             except NotImplementedError:
                 raise
             except Exception:
-                self.errors += 1
-                print('ERROR: during publish_properties for node: {}'.format(node))
+                self.node_error(node)
+
+        # all setup - publish device ready state
+        self.publish(b'state', b'ready')
 
     def publish_data(self):
         """publish node data if node has updates"""
@@ -181,13 +195,21 @@ class HomieDevice:
             except NotImplementedError:
                 raise
             except Exception:
-                self.errors += 1
-                print('ERROR: during publish_data for node: {}'.format(node))
+                self.node_error(node)
 
     def publish_device_stats(self):
         if utime.time() > self.next_update:
             # uptime
             uptime = utime.time() - self.start_time
             self.publish(b'$stats/uptime', uptime, True)
+            # freeheap
+            self.publish(b'$stats/freeheap', gc.mem_free(), True)
+            # wifi signal
+            self.publish(b'$stats/signal', utils.get_wifi_signal(), True)
             # set next update
             self.next_update = utime.time() + self.stats_interval
+
+    def node_error(self, node):
+        self.errors += 1
+        print('ERROR: during publish_data for node: {}'.format(node))
+        self.publish(b'state', b'alert')
