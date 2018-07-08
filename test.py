@@ -7,12 +7,6 @@ MICROPYPATH=app micropython test.py
 """
 
 import sys
-import utime
-import settings
-from homie.node import HomieNode
-from homie.node.simple import SimpleHomieNode
-from homie import HomieDevice
-
 try:
     if sys.implementation.name != 'micropython':
         raise NotImplementedError
@@ -21,6 +15,12 @@ except Exception:
     print('SEE DOCUMENTATION FOR DETAILS:')
     print('...')
     sys.exit()
+
+import utime
+import settings
+from homie.node import HomieNode
+from homie.node.simple import SimpleHomieNode
+from homie import HomieDevice
 
 
 # Error Node for tests
