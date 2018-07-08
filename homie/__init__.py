@@ -1,9 +1,12 @@
 import sys
 import utime
 from ucollections import namedtuple
-from umqtt.simple import MQTTClient
-
 from homie import utils
+
+try:
+    from network import mqtt as MQTTClient
+except ImportError:
+    from .mocks.mqtt import Mqtt as MQTTClient
 
 __version__ = b'0.1.2'
 
@@ -43,33 +46,30 @@ class HomieDevice:
         utils.wifi_connect()
 
         try:
-            self._umqtt_connect()
-        except:
+            self._mqtt_connect()
+        except Exception as e:
             print('ERROR: can not connect to MQTT')
+            print(e)
             # self.mqtt.publish = lambda topic, payload, retain, qos: None
 
-    def _umqtt_connect(self):
+    def _mqtt_connect(self):
         # mqtt client
         self.mqtt = MQTTClient(
-            self.settings.DEVICE_ID,
+            'microhomie',
             self.settings.MQTT_BROKER,
-            port=self.settings.MQTT_PORT,
+            autoreconnect=True,
+            clientid=self.settings.DEVICE_ID,
+            keepalive=self.settings.MQTT_KEEPALIVE,
+            lwt_topic=self.topic + b'/$online',
+            lwt_msg=b'false',
+            lwt_qos=1,
+            lwt_retain=True,
             user=self.settings.MQTT_USERNAME,
             password=self.settings.MQTT_PASSWORD,
-            keepalive=self.settings.MQTT_KEEPALIVE,
-            ssl=self.settings.MQTT_SSL,
-            ssl_params=self.settings.MQTT_SSL_PARAMS)
-
-        self.mqtt.DEBUG = True
-
-        # set callback
-        self.mqtt.set_callback(self.sub_cb)
-
-        # set last will testament
-        self.mqtt.set_last_will(self.topic + b'/$online', b'false',
-                                retain=True, qos=1)
-
-        self.mqtt.connect()
+            data_cb=self.sub_cb,
+        )
+        self.mqtt.start()
+        print('MQTT Status: %s' % self.mqtt.status())
 
         # subscribe to device topics
         self.mqtt.subscribe(self.topic + b'/$stats/interval/set')
@@ -130,7 +130,7 @@ class HomieDevice:
                 # tries to reconnect
                 while not done_reconnect:
                     try:
-                        self._umqtt_connect()
+                        self._mqtt_connect()
                         self.publish_properties()  # re-publish
                         done_reconnect = True
                     except Exception as e:

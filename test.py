@@ -60,8 +60,9 @@ homie_device.add_node(n)
 homie_device.add_node(Error())
 homie_device.publish_properties()
 
-while True:
-    homie_device.publish_data()
-    n.value = utime.time()
-    print('INFO: {}'.format(n))
-    utime.sleep(1)
+if __name__ == "__main__":
+    while True:
+        homie_device.publish_data()
+        n.value = utime.time()
+        print('INFO: {}'.format(n))
+        utime.sleep(1)
